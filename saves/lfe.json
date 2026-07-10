@@ -1,0 +1,23 @@
+{
+  "meta": {
+    "created": "2026-07-10T19:54:51.172303",
+    "last_updated": "2026-07-10T19:54:51.172688"
+  },
+  "turn": 0,
+  "world_state": {},
+  "nodes": {},
+  "events": [
+    {
+      "time": "Day 0",
+      "actors": [
+        "Person_Player"
+      ],
+      "targets": [],
+      "effects": {
+        "note": "World initialized from intake interview."
+      },
+      "confidence": 1.0,
+      "visibility": "public"
+    }
+  ]
+}
