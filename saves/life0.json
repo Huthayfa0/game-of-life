@@ -1,0 +1,208 @@
+{
+  "meta": {
+    "created": "2026-07-31T12:26:07.924526",
+    "last_updated": "2026-07-31T12:26:07.925539"
+  },
+  "turn": 0,
+  "world_state": {
+    "economy": "stable",
+    "season": "unknown",
+    "personal_stress_level": "low",
+    "global_health_trend": "good"
+  },
+  "nodes": {
+    "Person_Player": {
+      "id": "Person_Player",
+      "name": "Player",
+      "type": "Person",
+      "category": "Social",
+      "attributes": {
+        "age": "unknown",
+        "health": "good",
+        "money": "good",
+        "mood": "hungry",
+        "job": "engineer",
+        "location": "Citu"
+      },
+      "relations": [
+        {
+          "relation": "lives_in",
+          "target": "City_Citu",
+          "strength": 100,
+          "confidence": 0.9,
+          "visibility": "public",
+          "reason": "Player resides in Citu"
+        },
+        {
+          "relation": "lives_in",
+          "target": "Housing_Current",
+          "strength": 100,
+          "confidence": 0.8,
+          "visibility": "public",
+          "reason": "Player's current housing"
+        },
+        {
+          "relation": "works_for",
+          "target": "Company_Employer",
+          "strength": 80,
+          "confidence": 0.9,
+          "visibility": "public",
+          "reason": "Player is an engineer at this company"
+        },
+        {
+          "relation": "family_of",
+          "target": "Person_Family",
+          "strength": 90,
+          "confidence": 0.7,
+          "visibility": "private",
+          "reason": "Important people in player's life"
+        },
+        {
+          "relation": "has_goal",
+          "target": "Goal_Rich",
+          "strength": 90,
+          "confidence": 0.95,
+          "visibility": "private",
+          "reason": "Player wants to become rich"
+        },
+        {
+          "relation": "has_goal",
+          "target": "Goal_Land",
+          "strength": 80,
+          "confidence": 0.9,
+          "visibility": "private",
+          "reason": "Player wants to own a lot of land"
+        }
+      ],
+      "state": "stable",
+      "history": [
+        {
+          "time": "Day 0",
+          "event": "Initial graph created from intake interview"
+        }
+      ]
+    },
+    "City_Citu": {
+      "id": "City_Citu",
+      "name": "Citu",
+      "type": "City",
+      "category": "Geographic",
+      "attributes": {
+        "population": "unknown",
+        "country": "unknown"
+      },
+      "relations": [],
+      "state": "stable",
+      "history": [
+        {
+          "time": "Day 0",
+          "event": "Added as player's city of residence"
+        }
+      ]
+    },
+    "Housing_Current": {
+      "id": "Housing_Current",
+      "name": "Current Housing",
+      "type": "Infrastructure",
+      "category": "Geographic",
+      "attributes": {
+        "type": "unknown",
+        "occupants": "player and family"
+      },
+      "relations": [],
+      "state": "stable",
+      "history": [
+        {
+          "time": "Day 0",
+          "event": "Added as player's housing"
+        }
+      ]
+    },
+    "Company_Employer": {
+      "id": "Company_Employer",
+      "name": "Engineering Employer",
+      "type": "Company",
+      "category": "Economic",
+      "attributes": {
+        "industry": "engineering",
+        "size": "unknown"
+      },
+      "relations": [],
+      "state": "stable",
+      "history": [
+        {
+          "time": "Day 0",
+          "event": "Added as player's employer"
+        }
+      ]
+    },
+    "Person_Family": {
+      "id": "Person_Family",
+      "name": "Family",
+      "type": "Person",
+      "category": "Social",
+      "attributes": {
+        "relationship": "family",
+        "count": "unknown"
+      },
+      "relations": [],
+      "state": "stable",
+      "history": [
+        {
+          "time": "Day 0",
+          "event": "Added as important people in player's life"
+        }
+      ]
+    },
+    "Goal_Rich": {
+      "id": "Goal_Rich",
+      "name": "Become Rich",
+      "type": "Goal",
+      "category": "Abstract",
+      "attributes": {
+        "priority": 90,
+        "description": "Achieve significant wealth"
+      },
+      "relations": [],
+      "state": "in_progress",
+      "history": [
+        {
+          "time": "Day 0",
+          "event": "Goal created from player's stated aim"
+        }
+      ]
+    },
+    "Goal_Land": {
+      "id": "Goal_Land",
+      "name": "Own a Lot of Land",
+      "type": "Goal",
+      "category": "Abstract",
+      "attributes": {
+        "priority": 80,
+        "description": "Acquire substantial land holdings"
+      },
+      "relations": [],
+      "state": "in_progress",
+      "history": [
+        {
+          "time": "Day 0",
+          "event": "Goal created from player's stated aim"
+        }
+      ]
+    }
+  },
+  "events": [
+    {
+      "time": "Day 0",
+      "actors": [
+        "Person_Player"
+      ],
+      "targets": [],
+      "effects": {
+        "note": "World initialized from intake interview."
+      },
+      "confidence": 1.0,
+      "visibility": "public"
+    }
+  ]
+}

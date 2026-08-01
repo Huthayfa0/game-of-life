@@ -2,10 +2,11 @@
 Personal Life Graph Simulation - CLI entry point.
 
 Usage:
+    export OPENROUTER_API_KEY=sk-or-...
     python main.py
 
-Requires a local Ollama server running (`ollama serve`), and the models
-qwen3:4b (generation) and qwen3-rag (embeddings, optional) pulled.
+Uses the `openai` Python library against an OpenAI-compatible API
+(OpenRouter by default -- see config.py to change provider/model).
 """
 import os
 import sys
@@ -13,7 +14,7 @@ import sys
 import config
 from engine import run_interview, process_action
 from graph_store import GraphStore
-import ollama_client as oc
+import llm_client as oc
 
 SAVE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "saves")
 
@@ -55,9 +56,12 @@ def main():
             timeout=config.TIMEOUT_GENERATE,
             max_tokens=config.MAX_TOKENS,
         )
-    except oc.OllamaError as e:
+    except oc.LLMError as e:
         print(f"\n[Error] {e}")
-        print(f"Start Ollama with `ollama serve` and make sure `{config.GEN_MODEL}` is pulled.")
+        print(
+            f"Check that your API key is set (config.API_KEY / OPENROUTER_API_KEY) "
+            f"and that '{config.GEN_MODEL}' is available at {config.BASE_URL}."
+        )
         sys.exit(1)
 
     save_path = choose_save()
@@ -87,7 +91,7 @@ def main():
 
         try:
             narration = process_action(store, action)
-        except oc.OllamaError as e:
+        except oc.LLMError as e:
             print(f"[Model error, action not applied: {e}]")
             continue
 

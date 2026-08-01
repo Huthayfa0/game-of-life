@@ -1,5 +1,5 @@
 """
-Engine: ties together GraphStore + Ollama + prompts.
+Engine: ties together GraphStore + the LLM client + prompts.
 - run_interview(): builds the initial graph from Q&A
 - process_action(): retrieves relevant context (RAG), asks the model to
   resolve the action, applies the diff to the graph, appends events/history
@@ -7,7 +7,7 @@ Engine: ties together GraphStore + Ollama + prompts.
 import json
 
 import config
-import ollama_client as oc
+import llm_client as oc
 import prompts
 from graph_store import GraphStore
 
@@ -67,7 +67,7 @@ def run_interview() -> GraphStore:
 
 
 def _get_context(store: GraphStore, action_text: str, top_k: int = None) -> str:
-    """RAG step: try embedding similarity via qwen3-rag; fall back to keyword match."""
+    """RAG step: try embedding similarity via the configured embedding model; fall back to keyword match."""
     top_k = top_k or config.RAG_TOP_K
     relevant_nodes = None
     try:
@@ -77,13 +77,13 @@ def _get_context(store: GraphStore, action_text: str, top_k: int = None) -> str:
             node_text = json.dumps(node)
             try:
                 node_vec = oc.embed(EMBED_MODEL, node_text, timeout=config.TIMEOUT_EMBED)
-            except oc.OllamaError:
+            except oc.LLMError:
                 continue
             sim = oc.cosine_similarity(query_vec, node_vec)
             scored.append((sim, node))
         scored.sort(key=lambda x: -x[0])
         relevant_nodes = [n for _, n in scored[:top_k]]
-    except oc.OllamaError:
+    except oc.LLMError:
         relevant_nodes = None
 
     if not relevant_nodes:

@@ -2,7 +2,8 @@
 Central configuration. Edit these values directly, or override at launch
 via environment variables, e.g.:
 
-    GRAPH_RPG_GEN_MODEL=phi python main.py
+    OPENROUTER_API_KEY=sk-... python main.py
+    GRAPH_RPG_GEN_MODEL=openai/gpt-4o-mini python main.py
     GRAPH_RPG_THINK=true python main.py
 """
 import os
@@ -25,28 +26,46 @@ def _env_int(name: str, default: int) -> int:
         return default
 
 
+# ---- Backend (any OpenAI-compatible API) ----
+# Defaults to OpenRouter. Point this at OpenAI directly, or any other
+# OpenAI-compatible provider, by overriding the env vars below.
+BASE_URL = os.environ.get("GRAPH_RPG_BASE_URL", "https://openrouter.ai/api/v1")
+API_KEY = (
+    os.environ.get("GRAPH_RPG_API_KEY")
+    or os.environ.get("OPENROUTER_API_KEY")
+    or os.environ.get("OPENAI_API_KEY")
+)
+if not API_KEY:
+    raise RuntimeError(
+        "No API key found. Set the OPENROUTER_API_KEY environment variable "
+        "(or OPENAI_API_KEY / GRAPH_RPG_API_KEY), e.g.:\n"
+        "    export OPENROUTER_API_KEY=sk-or-...\n"
+        "Get a key at https://openrouter.ai/keys"
+    )
+
 # ---- Models ----
-GEN_MODEL = os.environ.get("GRAPH_RPG_GEN_MODEL", "qwen3:4b")
-EMBED_MODEL = os.environ.get("GRAPH_RPG_EMBED_MODEL", "qwen3-rag")
-FALLBACK_MODEL = os.environ.get("GRAPH_RPG_FALLBACK_MODEL", "phi")  # unused by default, available as a swap-in
+# Pick any model id your BASE_URL provider serves. Defaults below assume
+# OpenRouter; swap these if you point BASE_URL elsewhere.
+GEN_MODEL = os.environ.get("GRAPH_RPG_GEN_MODEL", "nvidia/nemotron-3-ultra-550b-a55b:free")
+EMBED_MODEL = os.environ.get("GRAPH_RPG_EMBED_MODEL", "openai/text-embedding-3-small")
 
 # ---- Thinking mode ----
-# qwen3 models support an extended "thinking"/chain-of-thought pass before
-# answering. It's slow and not needed here since we only want strict JSON
-# out. THINK=False sends {"think": false} to Ollama (supported on Ollama
-# 0.6+ for qwen3-family models) AND the system prompts explicitly forbid
-# reasoning output, as a belt-and-suspenders approach for older Ollama
-# versions that ignore the "think" field.
+# Some models (reasoning models) can emit an extended chain-of-thought pass
+# before answering. It's slow and unnecessary here since we only want
+# strict JSON out. THINK=False both asks the API to suppress it (where
+# supported) and instructs the model directly in the system prompt not to
+# show reasoning, as a belt-and-suspenders approach for models/providers
+# that don't support an explicit "no thinking" API flag.
 THINK = _env_bool("GRAPH_RPG_THINK", False)
 
 # ---- Timeouts (seconds) ----
-# Local CPU inference, especially for the first request after a model
-# loads into memory, can be slow -- these are generous on purpose.
-TIMEOUT_GENERATE = _env_int("GRAPH_RPG_TIMEOUT_GENERATE", 6000)   # 10 min
-TIMEOUT_EMBED = _env_int("GRAPH_RPG_TIMEOUT_EMBED", 1200)         # 2 min per embedding call
+# Generous by default since some hosted models (especially free-tier /
+# large MoE models) can be slow or queued.
+TIMEOUT_GENERATE = _env_int("GRAPH_RPG_TIMEOUT_GENERATE", 60)   # 1 min
+TIMEOUT_EMBED = _env_int("GRAPH_RPG_TIMEOUT_EMBED", 12)         # 12 sec per embedding call
 
 # ---- Output length cap ----
-# Third safety net against runaway "thinking" (on top of think=False and
+# Extra safety net against runaway "thinking" (on top of THINK=False and
 # the /no_think prompt directive): hard-caps how many tokens the model can
 # generate per call. 2048 is comfortably more than a JSON graph update
 # needs, but stops a misbehaving model from burning thousands of tokens
