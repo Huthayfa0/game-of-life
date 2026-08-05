@@ -21,6 +21,9 @@ class GraphStore:
         self.world_state: dict = {}    # global variables
         self.events: list = []         # global event log
         self.turn: int = 0             # "Day N" counter
+        self.last_narrative: str = ""            # most recent narrative shown to the player
+        self.last_suggested_actions: list = []   # most recent action menu shown to the player
+        self.last_evidence_used: list = []       # most recent {"claim","source","confidence"} list
         self.meta: dict = {
             "created": datetime.utcnow().isoformat(),
             "last_updated": datetime.utcnow().isoformat(),
@@ -103,6 +106,19 @@ class GraphStore:
         scored.sort(key=lambda x: -x[0])
         return [n for _, n in scored[:top_k]]
 
+    def edges(self):
+        """
+        Returns a flat list of (source_id, relation, target_id) for every
+        relation in the graph -- useful for checking how connected the
+        graph actually is (e.g. are nodes only linked to Person_Player, or
+        to each other too).
+        """
+        result = []
+        for n in self.nodes.values():
+            for r in n.get("relations", []):
+                result.append((n["id"], r.get("relation"), r.get("target")))
+        return result
+
     # ---------- persistence ----------
 
     def to_dict(self) -> dict:
@@ -113,6 +129,9 @@ class GraphStore:
             "world_state": self.world_state,
             "nodes": self.nodes,
             "events": self.events,
+            "last_narrative": self.last_narrative,
+            "last_suggested_actions": self.last_suggested_actions,
+            "last_evidence_used": self.last_evidence_used,
         }
 
     def save(self, path: str):
@@ -130,6 +149,9 @@ class GraphStore:
         store.world_state = data.get("world_state", {})
         store.nodes = data.get("nodes", {})
         store.events = data.get("events", [])
+        store.last_narrative = data.get("last_narrative", "")
+        store.last_suggested_actions = data.get("last_suggested_actions", [])
+        store.last_evidence_used = data.get("last_evidence_used", [])
         return store
 
     def summary_text(self, max_nodes: int = 40) -> str:

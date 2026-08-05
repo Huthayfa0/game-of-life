@@ -1,44 +1,43 @@
 """
 Engine: ties together GraphStore + the LLM client + prompts.
-- run_interview(): builds the initial graph from Q&A
+- run_interview(): a short Q&A, then asks the model to build the initial
+  graph PLUS an opening narrative and a menu of suggested next actions.
 - process_action(): retrieves relevant context (RAG), asks the model to
-  resolve the action, applies the diff to the graph, appends events/history
+  resolve the action, applies the diff to the graph, appends events/history,
+  and returns a narrative + a fresh menu of suggested next actions.
 """
 import json
 
 import config
 import llm_client as oc
 import prompts
+import web_search
 from graph_store import GraphStore
 
 GEN_MODEL = config.GEN_MODEL
 EMBED_MODEL = config.EMBED_MODEL
 
+# Kept deliberately short -- the model fleshes out the rest of the world
+# itself (see rule 10 / the INTERVIEW_SYSTEM prompt) rather than
+# interrogating the player for every detail.
 INTERVIEW_QUESTIONS = [
-    "Where do you live (city/country)?",
-    "Describe your current living situation (housing, who you live with).",
-    "What's your job / main occupation right now?",
-    "Roughly, how are things financially right now?",
-    "How's your health / energy level lately?",
-    "Who are the important people in your life right now, and your relationship to them?",
-    "What are 1-3 things you're currently trying to achieve or working toward?",
-    "Anything else about your current situation worth capturing?",
+    "In a sentence, where do you live and what's your living situation?",
+    "What do you do (job/school/etc.), and how's that going?",
+    "What's one goal or worry on your mind lately?",
 ]
 
 
-def run_interview() -> GraphStore:
-    print("\n=== World Setup: tell me about your current life ===")
-    print("(Press Enter to skip a question if it doesn't apply.)\n")
-    answers = {}
-    for q in INTERVIEW_QUESTIONS:
-        ans = input(f"{q}\n> ").strip()
-        if ans:
-            answers[q] = ans
-
-    qa_text = "\n".join(f"Q: {q}\nA: {a}" for q, a in answers.items())
+def build_initial_graph(answers: dict):
+    """
+    Core interview logic, with no stdin/stdout of its own -- takes a
+    {question: answer} dict (any subset of INTERVIEW_QUESTIONS, possibly
+    empty) and returns (store, narrative, suggested_actions). Safe to call
+    from any frontend (CLI, web UI, etc.).
+    """
+    qa_text = "\n".join(f"Q: {q}\nA: {a}" for q, a in answers.items() if a) or \
+        "(no answers given -- invent a plausible ordinary life)"
     prompt = f"Interview answers:\n\n{qa_text}\n\nBuild the initial graph JSON now."
 
-    print("\n[Building your initial world graph...]")
     raw = oc.generate(
         GEN_MODEL,
         prompt,
@@ -63,7 +62,29 @@ def run_interview() -> GraphStore:
         "confidence": 1.0,
         "visibility": "public",
     })
-    return store
+
+    narrative = data.get("narrative", "(no opening narrative returned)")
+    suggested_actions = data.get("suggested_actions", [])
+    return store, narrative, suggested_actions
+
+
+def run_interview():
+    """
+    CLI wrapper: prompts on stdin/stdout for INTERVIEW_QUESTIONS, then
+    delegates to build_initial_graph(). Returns (store, narrative,
+    suggested_actions).
+    """
+    print("\n=== World Setup ===")
+    print("A few quick questions -- keep answers short, I'll fill in the rest.")
+    print("(Press Enter to skip any of them.)\n")
+    answers = {}
+    for q in INTERVIEW_QUESTIONS:
+        ans = input(f"{q}\n> ").strip()
+        if ans:
+            answers[q] = ans
+
+    print("\n[Building your world...]")
+    return build_initial_graph(answers)
 
 
 def _get_context(store: GraphStore, action_text: str, top_k: int = None) -> str:
@@ -104,13 +125,68 @@ def _get_context(store: GraphStore, action_text: str, top_k: int = None) -> str:
     return "\n".join(lines)
 
 
-def process_action(store: GraphStore, action_text: str) -> str:
-    """Returns narration text; mutates store in place."""
+def _gather_evidence(store: GraphStore, action_text: str) -> list:
+    """
+    Decides whether the action needs real-world grounding and, if so, runs
+    the search(es) and returns a flat list of {"query", "title", "url",
+    "snippet"} dicts. Returns [] for mundane actions, if web search is
+    disabled, or if anything along the way fails -- degrading gracefully
+    to "resolve without extra evidence" rather than blocking the turn.
+    """
+    if not config.ENABLE_WEB_SEARCH or not web_search.is_available():
+        return []
+
+    try:
+        raw = oc.generate(
+            GEN_MODEL,
+            f"Player action: {action_text}\n\n"
+            f"Relevant graph snapshot:\n{store.summary_text(max_nodes=15)}",
+            system=prompts.SEARCH_QUERY_SYSTEM,
+            temperature=0.2,
+            think=config.THINK,
+            timeout=config.TIMEOUT_GENERATE,
+            max_tokens=300,
+        )
+        data = oc.extract_json(raw)
+    except oc.LLMError:
+        return []
+
+    queries = data.get("queries", [])[: config.WEB_SEARCH_MAX_QUERIES]
+    evidence = []
+    for q in queries:
+        for r in web_search.search(q):
+            evidence.append({"query": q, **r})
+    return evidence
+
+
+def _format_evidence(evidence: list) -> str:
+    if not evidence:
+        return ""
+    lines = [
+        "EVIDENCE (from web search -- ground your resolution in these facts, "
+        "and note in evidence_used what you relied on):"
+    ]
+    for e in evidence:
+        lines.append(f"- [{e['query']}] {e['title']}: {e['snippet']} (source: {e['url']})")
+    return "\n".join(lines)
+
+
+def process_action(store: GraphStore, action_text: str):
+    """
+    Resolves one action, mutates store in place, and returns
+    (narrative, suggested_actions, evidence_used). evidence_used is the
+    list of {"claim", "source", "confidence"} dicts the model says it
+    actually relied on (empty list if no evidence was gathered or none
+    was used) -- see prompts.ACTION_SYSTEM's evidence_used field.
+    """
     store.turn += 1
     context = _get_context(store, action_text)
+    evidence = _gather_evidence(store, action_text)
+    evidence_block = _format_evidence(evidence)
 
     prompt = (
         f"{context}\n\n"
+        f"{evidence_block}\n\n"
         f"PLAYER ACTION (Day {store.turn}): {action_text}\n\n"
         f"Resolve this action now."
     )
@@ -127,8 +203,13 @@ def process_action(store: GraphStore, action_text: str) -> str:
 
     time_label = f"Day {store.turn}"
 
+    evidence_used = data.get("evidence_used", [])
+
     event = data.get("event", {})
     event["time"] = time_label
+    if evidence:
+        event["evidence_searched"] = evidence
+    event["evidence_used"] = evidence_used
     store.add_event(event)
 
     for node in data.get("node_updates", []):
@@ -140,4 +221,6 @@ def process_action(store: GraphStore, action_text: str) -> str:
     for k, v in data.get("world_state_changes", {}).items():
         store.world_state[k] = v
 
-    return data.get("narration", "(no narration returned)")
+    narrative = data.get("narrative", "(no narrative returned)")
+    suggested_actions = data.get("suggested_actions", [])
+    return narrative, suggested_actions, evidence_used

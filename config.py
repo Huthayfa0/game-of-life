@@ -61,8 +61,8 @@ THINK = _env_bool("GRAPH_RPG_THINK", False)
 # ---- Timeouts (seconds) ----
 # Generous by default since some hosted models (especially free-tier /
 # large MoE models) can be slow or queued.
-TIMEOUT_GENERATE = _env_int("GRAPH_RPG_TIMEOUT_GENERATE", 60)   # 1 min
-TIMEOUT_EMBED = _env_int("GRAPH_RPG_TIMEOUT_EMBED", 12)         # 12 sec per embedding call
+TIMEOUT_GENERATE = _env_int("GRAPH_RPG_TIMEOUT_GENERATE", 600)   # 10 min
+TIMEOUT_EMBED = _env_int("GRAPH_RPG_TIMEOUT_EMBED", 120)         # 2 min per embedding call
 
 # ---- Output length cap ----
 # Extra safety net against runaway "thinking" (on top of THINK=False and
@@ -78,3 +78,14 @@ TEMPERATURE_ACTION = 0.5
 
 # ---- RAG ----
 RAG_TOP_K = _env_int("GRAPH_RPG_RAG_TOP_K", 8)
+
+# ---- Web search grounding ----
+# Grounds action resolution in real-world facts (population/military/
+# economic figures, historical precedent, current events, real entities)
+# via DuckDuckGo, per the world model's "Retrieving Missing Information"
+# rule: search the graph first, then infer, then search the internet, and
+# only fall back to the model's own knowledge if neither applies.
+ENABLE_WEB_SEARCH = _env_bool("GRAPH_RPG_ENABLE_WEB_SEARCH", True)
+WEB_SEARCH_MAX_RESULTS = _env_int("GRAPH_RPG_WEB_SEARCH_MAX_RESULTS", 4)
+WEB_SEARCH_TIMEOUT = _env_int("GRAPH_RPG_WEB_SEARCH_TIMEOUT", 15)
+WEB_SEARCH_MAX_QUERIES = _env_int("GRAPH_RPG_WEB_SEARCH_MAX_QUERIES", 3)
