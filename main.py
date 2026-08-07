@@ -64,6 +64,7 @@ def show_situation(narrative: str, suggested_actions: list, evidence_used: list 
         print("  (or just type your own action)")
     print(
         "\nOther commands: 'graph' = show full graph state, "
+        "'timeline' = review your event history, "
         "'find <text>' = search your saved graph, "
         "'search <query>' = search the web, "
         "'quit' = save & exit."
@@ -174,6 +175,9 @@ def main():
             break
         if raw.lower() == "graph":
             print("\n" + store.summary_text())
+            continue
+        if raw.lower() == "timeline":
+            print("\n" + store.timeline_text())
             continue
         if raw.lower().startswith("find "):
             handle_find(store, raw[len("find "):].strip())

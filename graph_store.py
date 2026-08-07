@@ -168,3 +168,27 @@ class GraphStore:
                 f"relations=[{rel_str}]"
             )
         return "\n".join(lines)
+
+    def timeline_text(self) -> str:
+        """
+        Formats the full event log as a readable "Day N: summary" list, in
+        chronological order, with any evidence used for that turn nested
+        underneath -- a way to review how you got here without reading
+        raw JSON. Used by both the CLI's 'timeline' command and the web
+        UI's Timeline tab.
+        """
+        if not self.events:
+            return "No events yet."
+        lines = []
+        for e in self.events:
+            time_label = e.get("time", "?")
+            summary = e.get("summary") or (e.get("effects") or {}).get("note") or "(no summary)"
+            lines.append(f"{time_label}: {summary}")
+            for ev in e.get("evidence_used") or []:
+                claim = (ev.get("claim") or "").strip()
+                if not claim:
+                    continue
+                source = (ev.get("source") or "").strip()
+                suffix = f" [{source}]" if source else ""
+                lines.append(f"    source: {claim}{suffix}")
+        return "\n".join(lines)

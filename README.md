@@ -48,9 +48,10 @@ Then open the local URL it prints (usually `http://127.0.0.1:7860`). The
 narrative, and the action buttons; **Graph** shows your world as an
 interactive network diagram (drag nodes, scroll to zoom, hover for
 details — see "Visual graph view" below) with a raw-text fallback and
-`find`; **Web search** is the same on-demand lookup as the CLI's `search`
-command. A save started in one frontend loads fine in the other — they
-read and write the same JSON files in `saves/`.
+`find`; **Timeline** lists every turn in order with its sources, so you
+can review how you got here; **Web search** is the same on-demand lookup
+as the CLI's `search` command. A save started in one frontend loads fine
+in the other — they read and write the same JSON files in `saves/`.
 
 **First run (either frontend):** three short questions (where you live,
 what you do, what's on your mind), then the model builds your initial
@@ -86,14 +87,15 @@ menu evolves turn to turn instead of repeating. The web UI works the same
 way: click a radio option or type in the free-text box, then "Do it".
 
 In the terminal, `graph` prints the full current graph (every node, its
-attributes, and its relations) at any time. `find <text>` searches just
-your saved graph for matching nodes (useful once the graph gets large).
-`search <query>` runs an on-demand web search outside of any action.
-`quit` saves and exits. The web UI has the same three as separate tabs
-(**Graph**, its "Find" box, and **Web search**) instead of typed commands.
-Either way, your narrative and menu are saved after every turn, so
-relaunching (in either frontend) resumes exactly where you left off
-without another model call.
+attributes, and its relations) at any time. `timeline` prints every turn
+in chronological order with any sources that grounded it. `find <text>`
+searches just your saved graph for matching nodes (useful once the graph
+gets large). `search <query>` runs an on-demand web search outside of any
+action. `quit` saves and exits. The web UI has the same four as separate
+tabs (**Graph**, **Timeline**, its "Find" box, and **Web search**) instead
+of typed commands. Either way, your narrative and menu are saved after
+every turn, so relaunching (in either frontend) resumes exactly where you
+left off without another model call.
 
 ## Why the interview is short
 
@@ -291,7 +293,10 @@ graph actually is); `keyword_relevant_nodes()` (fallback retrieval if
 embeddings aren't available); `save()` / `load()` (JSON persistence);
 `summary_text()` (a compact plain-text dump of the whole graph, used both
 by the `graph` command and as fallback context if a save predates the
-narrative/suggestion fields).
+narrative/suggestion fields); `timeline_text()` (the full event log as a
+chronological "Day N: summary" list, with any evidence used nested
+underneath each entry — used by the `timeline` command and the web UI's
+Timeline tab).
 
 ### `web_search.py`
 DuckDuckGo search via the `ddgs` package (no API key needed). Exposes
@@ -348,8 +353,9 @@ interview if needed, then loops: show the current narrative, any sources
 used to ground it, and the numbered action menu; read one line of input;
 resolve it to an action (a menu number → that suggestion's text, anything
 else → itself as a custom action); run it through `process_action`; save;
-repeat. Also handles `graph` (dump full graph), `find <text>` (search the
-saved graph), `search <query>` (on-demand web search), and `quit`.
+repeat. Also handles `graph` (dump full graph), `timeline` (dump event
+history), `find <text>` (search the saved graph), `search <query>`
+(on-demand web search), and `quit`.
 
 ### `web_ui.py`
 The point-and-click alternative to `main.py`, built with
@@ -357,13 +363,14 @@ The point-and-click alternative to `main.py`, built with
 same `build_initial_graph()`, `process_action()`, `GraphStore`,
 `web_search`, and `INTERVIEW_QUESTIONS` that `main.py` uses, and reads/
 writes the same `saves/*.json` files, so nothing about the simulation
-itself is duplicated. Three tabs: **Play** (save picker, the 3 intake
+itself is duplicated. Four tabs: **Play** (save picker, the 3 intake
 questions, narrative box, a "Sources used this turn" accordion,
 suggested-action radio buttons, free-text action box), **Graph**
-(interactive vis.js network + a "find" box + the raw-text fallback), and
-**Web search** (on-demand lookup). Only run this one if you have `gradio`
-installed; `main.py` has no such requirement and remains the simpler,
-more transparent option when something needs debugging.
+(interactive vis.js network + a "find" box + the raw-text fallback),
+**Timeline** (chronological event log via `GraphStore.timeline_text()`),
+and **Web search** (on-demand lookup). Only run this one if you have
+`gradio` installed; `main.py` has no such requirement and remains the
+simpler, more transparent option when something needs debugging.
 
 `_format_evidence_markdown(evidence_used)` turns the list from
 `process_action()`'s third return value into a small bullet list (claim,
@@ -383,7 +390,8 @@ injected via `innerHTML`), but a full document loaded into an iframe is
 parsed normally and its scripts do run. `refresh_graph_views(store)`
 returns both the visual and the text fallback together, and is wired to
 fire automatically after every start/load/action, not just the manual
-refresh button.
+refresh button — `show_timeline(store)` for the Timeline tab is wired the
+same way.
 
 ## Notes / things you may want to tune
 
@@ -425,21 +433,16 @@ refresh button.
 
 Roughly in order of "smallest effort, biggest payoff" first:
 
-1. **Turn history / timeline view.** `store.events` already has everything;
-   a simple scrollable "Day N: ..." list (another Graph-tab section, or a
-   new tab) would let you review how you got here without reading raw
-   JSON.
-2. **Multiple concurrent lives in the web UI.** Right now switching saves
+1. **Multiple concurrent lives in the web UI.** Right now switching saves
    means reloading the page state; a proper save browser (thumbnail/list
    of all saves with last-played date, pulled from `meta.last_updated`)
    would make managing several playthroughs less clunky.
-3. **Cache embeddings.** Called out above already — becomes worth doing
+2. **Cache embeddings.** Called out above already — becomes worth doing
    once a save has enough nodes that every turn's RAG step visibly slows
    down.
-4. **NPCs with their own goals.** The spec's multi-actor/knowledge-graph
+3. **NPCs with their own goals.** The spec's multi-actor/knowledge-graph
    sections (#21, #22) are the biggest structural change on this list —
    worth it if you want people in your life to independently pursue their
    own goals and occasionally surprise you, rather than only reacting to
    your actions.
 
-Happy to build any of these out — just say which one.

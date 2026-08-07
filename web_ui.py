@@ -30,10 +30,12 @@ os.makedirs(SAVE_DIR, exist_ok=True)
 
 
 def list_saves():
+    """Returns sorted *.json filenames in saves/ (just names, not full paths)."""
     return sorted(f for f in os.listdir(SAVE_DIR) if f.endswith(".json"))
 
 
 def _save_path(name: str) -> str:
+    """Turns a save name (possibly blank) into a full path under saves/, defaulting to 'my_life.json'."""
     name = (name or "").strip() or "my_life"
     if not name.endswith(".json"):
         name += ".json"
@@ -41,6 +43,7 @@ def _save_path(name: str) -> str:
 
 
 def _format_evidence_markdown(evidence_used: list) -> str:
+    """Renders a process_action() evidence_used list as a markdown bullet list with clickable source links."""
     if not evidence_used:
         return "_No web evidence was used for this turn._"
     lines = []
@@ -59,6 +62,11 @@ def _format_evidence_markdown(evidence_used: list) -> str:
 # ---------- callbacks ----------
 
 def start_new(name, q1, q2, q3):
+    """
+    'Start new life' button callback: builds the initial graph from the 3
+    intake answers, saves it, and returns the values for every output
+    component (store, path, narrative, suggestions, save dropdown, evidence).
+    """
     answers = {}
     for q, a in zip(INTERVIEW_QUESTIONS, [q1, q2, q3]):
         if a and a.strip():
@@ -87,6 +95,7 @@ def start_new(name, q1, q2, q3):
 
 
 def load_existing(filename):
+    """'Load' button callback: reads a save file and returns its resume state (narrative/suggestions/evidence)."""
     if not filename:
         return (
             None, "", "Pick a save from the dropdown first.",
@@ -105,6 +114,11 @@ def load_existing(filename):
 
 
 def do_action(store, path, suggestion, custom_text):
+    """
+    'Do it' button callback: resolves whichever action was chosen (custom
+    text takes priority over the selected suggestion), saves the updated
+    store, and returns the new narrative/suggestions/evidence.
+    """
     if store is None:
         return None, "", "Start or load a game first.", gr.update(), "", _format_evidence_markdown([])
     action = (custom_text or "").strip() or suggestion
@@ -127,7 +141,13 @@ def do_action(store, path, suggestion, custom_text):
 
 
 def show_graph(store):
+    """Plain-text fallback view of the whole graph (same content as the CLI's 'graph' command)."""
     return store.summary_text() if store else "No game loaded yet."
+
+
+def show_timeline(store):
+    """Timeline tab content: the full event log in chronological order (same as the CLI's 'timeline' command)."""
+    return store.timeline_text() if store else "No game loaded yet."
 
 
 # Fixed palette so node categories are visually consistent turn to turn.
@@ -155,7 +175,9 @@ def _build_graph_document(store) -> str:
     """
     if not store or not store.nodes:
         return (
-            "<html><body style='font-family:sans-serif;padding:2rem;color:#666;'>"
+            "<html><head><meta name='color-scheme' content='light only'>"
+            "<style>html,body{background:#ffffff;}</style></head>"
+            "<body style='font-family:sans-serif;padding:2rem;color:#666;background:#ffffff;'>"
             "No graph yet -- start or load a game first.</body></html>"
         )
 
@@ -189,10 +211,16 @@ def _build_graph_document(store) -> str:
 <html>
 <head>
 <meta charset="utf-8">
+<meta name="color-scheme" content="light only">
 <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
 <style>
-  html, body {{ margin: 0; padding: 0; height: 100%; font-family: sans-serif; }}
-  #network {{ width: 100%; height: 100%; }}
+  /* explicit light background + text colors throughout -- without this,
+     browsers/OSes with forced dark mode can invert or blacken the page
+     background while vis.js's hardcoded dark label colors stay dark,
+     making all text invisible against a now-black background */
+  html, body {{ margin: 0; padding: 0; height: 100%; font-family: sans-serif;
+                background: #ffffff; color: #222; }}
+  #network {{ width: 100%; height: 100%; background: #ffffff; }}
 </style>
 </head>
 <body>
@@ -203,8 +231,8 @@ def _build_graph_document(store) -> str:
   const container = document.getElementById('network');
   const options = {{
     nodes: {{ shape: 'dot', size: 16, font: {{ size: 14, color: '#222' }} }},
-    edges: {{ font: {{ size: 10, align: 'middle', color: '#666' }}, color: {{ color: '#bbb' }},
-              smooth: {{ type: 'dynamic' }} }},
+    edges: {{ font: {{ size: 10, align: 'middle', color: '#666', strokeWidth: 0 }},
+              color: {{ color: '#bbb' }}, smooth: {{ type: 'dynamic' }} }},
     physics: {{ stabilization: true, barnesHut: {{ gravitationalConstant: -8000, springLength: 150 }} }},
     groups: {groups_json},
     interaction: {{ hover: true }}
@@ -221,7 +249,7 @@ def show_graph_visual(store) -> str:
     escaped = html.escape(doc, quote=True)
     return (
         f'<iframe style="width:100%;height:650px;border:1px solid #ddd;'
-        f'border-radius:8px;" srcdoc="{escaped}"></iframe>'
+        f'border-radius:8px;background:#ffffff;" srcdoc="{escaped}"></iframe>'
     )
 
 
@@ -231,6 +259,7 @@ def refresh_graph_views(store):
 
 
 def do_find(store, term):
+    """'Find' button callback: same lookup as the CLI's 'find' command, formatted as a text block."""
     if store is None:
         return "No game loaded yet."
     if not term or not term.strip():
@@ -253,6 +282,7 @@ def do_find(store, term):
 
 
 def do_web_search(query):
+    """'Search' button callback: same on-demand lookup as the CLI's 'search' command."""
     if not web_search.is_available():
         return "Web search isn't available: run `pip install ddgs`."
     if not query or not query.strip():
@@ -334,6 +364,20 @@ with gr.Blocks(title="Personal Life Graph Simulation") as demo:
         find_btn = gr.Button("Find")
         find_result = gr.Textbox(label="Matches", lines=10, interactive=False)
         find_btn.click(do_find, [store_state, find_box], [find_result])
+
+    with gr.Tab("Timeline"):
+        gr.Markdown(
+            "### Event history\n"
+            "Every turn, in order, with any sources that grounded it -- "
+            "a way to review how you got here without reading raw JSON."
+        )
+        timeline_btn = gr.Button("Refresh timeline", variant="primary")
+        timeline_box = gr.Textbox(label="", lines=25, interactive=False)
+
+        timeline_btn.click(show_timeline, [store_state], [timeline_box])
+        start_evt.then(show_timeline, [store_state], [timeline_box])
+        load_evt.then(show_timeline, [store_state], [timeline_box])
+        act_evt.then(show_timeline, [store_state], [timeline_box])
 
     with gr.Tab("Web search"):
         gr.Markdown("On-demand web lookup, same source used for automatic evidence grounding.")

@@ -46,7 +46,7 @@ if not API_KEY:
 # ---- Models ----
 # Pick any model id your BASE_URL provider serves. Defaults below assume
 # OpenRouter; swap these if you point BASE_URL elsewhere.
-GEN_MODEL = os.environ.get("GRAPH_RPG_GEN_MODEL", "nvidia/nemotron-3-ultra-550b-a55b:free")
+GEN_MODEL = os.environ.get("GRAPH_RPG_GEN_MODEL", "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free")
 EMBED_MODEL = os.environ.get("GRAPH_RPG_EMBED_MODEL", "openai/text-embedding-3-small")
 
 # ---- Thinking mode ----
