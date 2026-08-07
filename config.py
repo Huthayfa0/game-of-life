@@ -67,10 +67,10 @@ TIMEOUT_EMBED = _env_int("GRAPH_RPG_TIMEOUT_EMBED", 120)         # 2 min per emb
 # ---- Output length cap ----
 # Extra safety net against runaway "thinking" (on top of THINK=False and
 # the /no_think prompt directive): hard-caps how many tokens the model can
-# generate per call. 2048 is comfortably more than a JSON graph update
+# generate per call. 32768 is comfortably more than a JSON graph update
 # needs, but stops a misbehaving model from burning thousands of tokens
 # on reasoning it wasn't supposed to produce at all.
-MAX_TOKENS = _env_int("GRAPH_RPG_MAX_TOKENS", 2048)
+MAX_TOKENS = _env_int("GRAPH_RPG_MAX_TOKENS", 32768)
 
 # ---- Generation temperature ----
 TEMPERATURE_INTERVIEW = 0.4
